@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
-    verification_token VARCHAR(255) NOT NULL,
-    verified_at TIMESTAMP
+    verification_token VARCHAR(255),
+    verified_at TIMESTAMP,
+    token_expiry TIMESTAMP WITH TIME ZONE
 );

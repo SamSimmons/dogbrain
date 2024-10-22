@@ -39,8 +39,10 @@ func gracefulShutdown(fiberServer *server.FiberServer, done chan bool) {
 }
 
 func main() {
-
-	server := server.New()
+	postmarkServerToken := os.Getenv("POSTMARK_SERVER_TOKEN")
+	postmarkAccountToken := os.Getenv("POSTMARK_SERVER_TOKEN")
+	fromEmail := "sam@dogbrain.app"
+	server := server.New(postmarkServerToken, postmarkAccountToken, fromEmail)
 
 	server.RegisterFiberRoutes()
 

@@ -24,11 +24,11 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.checkUserExistsStmt, err = db.PrepareContext(ctx, checkUserExists); err != nil {
+		return nil, fmt.Errorf("error preparing query CheckUserExists: %w", err)
+	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
-	}
-	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
-		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
 	}
 	if q.verifyUserStmt, err = db.PrepareContext(ctx, verifyUser); err != nil {
 		return nil, fmt.Errorf("error preparing query VerifyUser: %w", err)
@@ -38,14 +38,14 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.checkUserExistsStmt != nil {
+		if cerr := q.checkUserExistsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing checkUserExistsStmt: %w", cerr)
+		}
+	}
 	if q.createUserStmt != nil {
 		if cerr := q.createUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
-		}
-	}
-	if q.getUserByEmailStmt != nil {
-		if cerr := q.getUserByEmailStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getUserByEmailStmt: %w", cerr)
 		}
 	}
 	if q.verifyUserStmt != nil {
@@ -90,19 +90,19 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                 DBTX
-	tx                 *sql.Tx
-	createUserStmt     *sql.Stmt
-	getUserByEmailStmt *sql.Stmt
-	verifyUserStmt     *sql.Stmt
+	db                  DBTX
+	tx                  *sql.Tx
+	checkUserExistsStmt *sql.Stmt
+	createUserStmt      *sql.Stmt
+	verifyUserStmt      *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                 tx,
-		tx:                 tx,
-		createUserStmt:     q.createUserStmt,
-		getUserByEmailStmt: q.getUserByEmailStmt,
-		verifyUserStmt:     q.verifyUserStmt,
+		db:                  tx,
+		tx:                  tx,
+		checkUserExistsStmt: q.checkUserExistsStmt,
+		createUserStmt:      q.createUserStmt,
+		verifyUserStmt:      q.verifyUserStmt,
 	}
 }

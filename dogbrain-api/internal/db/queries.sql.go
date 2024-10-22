@@ -13,22 +13,43 @@ import (
 	"github.com/google/uuid"
 )
 
+const checkUserExists = `-- name: CheckUserExists :one
+SELECT EXISTS(
+    SELECT 1 
+    FROM users 
+    WHERE LOWER(email) = LOWER($1)
+) AS exists
+`
+
+func (q *Queries) CheckUserExists(ctx context.Context, lower string) (bool, error) {
+	row := q.queryRow(ctx, q.checkUserExistsStmt, checkUserExists, lower)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
-    id, email, password, created_at, updated_at, verification_token
+    id, 
+    email, 
+    password, 
+    created_at, 
+    updated_at, 
+    verification_token, 
+    token_expiry
 ) VALUES (
-    $1, $2, $3, $4, $5, $6
-)
-RETURNING id, email, password, created_at, updated_at, verification_token, verified_at
+    $1, $2, $3, $4, $5, $6, $7
+) RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry
 `
 
 type CreateUserParams struct {
-	ID                uuid.UUID `json:"id"`
-	Email             string    `json:"email"`
-	Password          string    `json:"password"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	VerificationToken string    `json:"verification_token"`
+	ID                uuid.UUID      `json:"id"`
+	Email             string         `json:"email"`
+	Password          string         `json:"password"`
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	VerificationToken sql.NullString `json:"verification_token"`
+	TokenExpiry       sql.NullTime   `json:"token_expiry"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -39,6 +60,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.VerificationToken,
+		arg.TokenExpiry,
 	)
 	var i User
 	err := row.Scan(
@@ -49,44 +71,32 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.UpdatedAt,
 		&i.VerificationToken,
 		&i.VerifiedAt,
-	)
-	return i, err
-}
-
-const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password, created_at, updated_at, verification_token, verified_at FROM users
-WHERE email = $1 LIMIT 1
-`
-
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.queryRow(ctx, q.getUserByEmailStmt, getUserByEmail, email)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.Password,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.VerificationToken,
-		&i.VerifiedAt,
+		&i.TokenExpiry,
 	)
 	return i, err
 }
 
 const verifyUser = `-- name: VerifyUser :one
-UPDATE users
-SET verified_at = $2
-WHERE verification_token = $1 AND verified_at IS NULL
-RETURNING id, email, password, created_at, updated_at, verification_token, verified_at
+UPDATE users 
+SET 
+    verified_at = $1,
+    verification_token = NULL,
+    token_expiry = NULL
+WHERE 
+    verification_token = $2 
+    AND (token_expiry > $3 OR token_expiry IS NULL)
+    AND verified_at IS NULL  -- Only verify unverified users
+RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry
 `
 
 type VerifyUserParams struct {
-	VerificationToken string       `json:"verification_token"`
-	VerifiedAt        sql.NullTime `json:"verified_at"`
+	VerifiedAt        sql.NullTime   `json:"verified_at"`
+	VerificationToken sql.NullString `json:"verification_token"`
+	TokenExpiry       sql.NullTime   `json:"token_expiry"`
 }
 
 func (q *Queries) VerifyUser(ctx context.Context, arg VerifyUserParams) (User, error) {
-	row := q.queryRow(ctx, q.verifyUserStmt, verifyUser, arg.VerificationToken, arg.VerifiedAt)
+	row := q.queryRow(ctx, q.verifyUserStmt, verifyUser, arg.VerifiedAt, arg.VerificationToken, arg.TokenExpiry)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -96,6 +106,7 @@ func (q *Queries) VerifyUser(ctx context.Context, arg VerifyUserParams) (User, e
 		&i.UpdatedAt,
 		&i.VerificationToken,
 		&i.VerifiedAt,
+		&i.TokenExpiry,
 	)
 	return i, err
 }
