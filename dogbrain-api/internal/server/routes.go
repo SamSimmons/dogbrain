@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/argon2"
 
@@ -29,12 +30,26 @@ const (
 	maxPasswordLength = 128
 
 	tokenValidityDuration = 24 * time.Hour
-	maxEmailLength = 255
+	maxEmailLength        = 255
 )
 
 func (s *FiberServer) RegisterFiberRoutes() {
-	s.App.Post("/register", s.registerUser)
-	s.App.Get("/verify/:token", s.verifyEmail)
+	authLimiter := limiter.New(limiter.Config{
+		Max:        20,            // 20 requests
+		Expiration: 1 * time.Hour, // Per hour
+		KeyGenerator: func(c *fiber.Ctx) string {
+			return c.IP() // Rate limit by IP
+		},
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"error": "Too many requests. Please try again later.",
+			})
+		},
+	})
+	v1 := s.App.Group("/api/v1")
+	auth := v1.Group("/auth", authLimiter)
+	auth.Post("/register", s.registerUser)
+	auth.Get("/verify/:token", s.verifyEmail)
 }
 
 func validatePassword(password string) error {
@@ -150,17 +165,17 @@ func (s *FiberServer) registerUser(c *fiber.Ctx) error {
 	tokenExpiry := time.Now().Add(tokenValidityDuration)
 
 	_, err = s.DB.CreateUser(context.Background(), db.CreateUserParams{
-		ID:                uuid.New(),
-		Email:             normalizedEmail,
-		Password:          encodedHash,
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
+		ID:        uuid.New(),
+		Email:     normalizedEmail,
+		Password:  encodedHash,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 		VerificationToken: sql.NullString{
 			String: verificationToken,
-			Valid: true,
+			Valid:  true,
 		},
-		TokenExpiry:			 sql.NullTime{
-			Time: tokenExpiry,
+		TokenExpiry: sql.NullTime{
+			Time:  tokenExpiry,
 			Valid: true,
 		},
 	})
@@ -175,7 +190,7 @@ func (s *FiberServer) registerUser(c *fiber.Ctx) error {
 		// Log the error but don't expose it to the user
 		fmt.Printf("Failed to send verification email: %v\n", err)
 		// Don't return an error to the user to avoid leaking information
-}
+	}
 
 	// Return the same message whether the email existed or not
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -188,10 +203,14 @@ func (s *FiberServer) verifyEmail(c *fiber.Ctx) error {
 
 	_, err := s.DB.VerifyUser(context.Background(), db.VerifyUserParams{
 		VerificationToken: sql.NullString{
-			String:token,
+			String: token,
+			Valid:  true,
+		},
+		VerifiedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		Now: sql.NullTime{
+			Time:  time.Now(),
 			Valid: true,
 		},
-		VerifiedAt:        sql.NullTime{Time: time.Now(), Valid: true},
 	})
 
 	if err != nil {

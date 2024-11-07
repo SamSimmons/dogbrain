@@ -13,39 +13,42 @@ import { createFileRoute } from '@tanstack/react-router'
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
-import { Route as LoginImport } from './routes/login'
 import { Route as AuthImport } from './routes/_auth'
-import { Route as IndexImport } from './routes/index'
+import { Route as AnonImport } from './routes/_anon'
+import { Route as AnonIndexImport } from './routes/_anon.index'
 import { Route as AuthDashboardImport } from './routes/_auth.dashboard'
+import { Route as AnonSignUpImport } from './routes/_anon.sign-up'
+import { Route as AnonLoginImport } from './routes/_anon.login'
+import { Route as AnonCheckEmailImport } from './routes/_anon.check-email'
+import { Route as AnonVerifyTokenImport } from './routes/_anon.verify.$token'
 
 // Create Virtual Routes
 
-const AboutLazyImport = createFileRoute('/about')()
+const AnonAboutLazyImport = createFileRoute('/_anon/about')()
 
 // Create/Update Routes
-
-const AboutLazyRoute = AboutLazyImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => rootRoute,
-} as any).lazy(() => import('./routes/about.lazy').then((d) => d.Route))
-
-const LoginRoute = LoginImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRoute,
-} as any)
 
 const AuthRoute = AuthImport.update({
   id: '/_auth',
   getParentRoute: () => rootRoute,
 } as any)
 
-const IndexRoute = IndexImport.update({
-  id: '/',
-  path: '/',
+const AnonRoute = AnonImport.update({
+  id: '/_anon',
   getParentRoute: () => rootRoute,
 } as any)
+
+const AnonIndexRoute = AnonIndexImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AnonRoute,
+} as any)
+
+const AnonAboutLazyRoute = AnonAboutLazyImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => AnonRoute,
+} as any).lazy(() => import('./routes/_anon.about.lazy').then((d) => d.Route))
 
 const AuthDashboardRoute = AuthDashboardImport.update({
   id: '/dashboard',
@@ -53,15 +56,39 @@ const AuthDashboardRoute = AuthDashboardImport.update({
   getParentRoute: () => AuthRoute,
 } as any)
 
+const AnonSignUpRoute = AnonSignUpImport.update({
+  id: '/sign-up',
+  path: '/sign-up',
+  getParentRoute: () => AnonRoute,
+} as any)
+
+const AnonLoginRoute = AnonLoginImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AnonRoute,
+} as any)
+
+const AnonCheckEmailRoute = AnonCheckEmailImport.update({
+  id: '/check-email',
+  path: '/check-email',
+  getParentRoute: () => AnonRoute,
+} as any)
+
+const AnonVerifyTokenRoute = AnonVerifyTokenImport.update({
+  id: '/verify/$token',
+  path: '/verify/$token',
+  getParentRoute: () => AnonRoute,
+} as any)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
+    '/_anon': {
+      id: '/_anon'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof AnonImport
       parentRoute: typeof rootRoute
     }
     '/_auth': {
@@ -71,19 +98,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthImport
       parentRoute: typeof rootRoute
     }
-    '/login': {
-      id: '/login'
+    '/_anon/check-email': {
+      id: '/_anon/check-email'
+      path: '/check-email'
+      fullPath: '/check-email'
+      preLoaderRoute: typeof AnonCheckEmailImport
+      parentRoute: typeof AnonImport
+    }
+    '/_anon/login': {
+      id: '/_anon/login'
       path: '/login'
       fullPath: '/login'
-      preLoaderRoute: typeof LoginImport
-      parentRoute: typeof rootRoute
+      preLoaderRoute: typeof AnonLoginImport
+      parentRoute: typeof AnonImport
     }
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutLazyImport
-      parentRoute: typeof rootRoute
+    '/_anon/sign-up': {
+      id: '/_anon/sign-up'
+      path: '/sign-up'
+      fullPath: '/sign-up'
+      preLoaderRoute: typeof AnonSignUpImport
+      parentRoute: typeof AnonImport
     }
     '/_auth/dashboard': {
       id: '/_auth/dashboard'
@@ -92,10 +126,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthDashboardImport
       parentRoute: typeof AuthImport
     }
+    '/_anon/about': {
+      id: '/_anon/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AnonAboutLazyImport
+      parentRoute: typeof AnonImport
+    }
+    '/_anon/': {
+      id: '/_anon/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AnonIndexImport
+      parentRoute: typeof AnonImport
+    }
+    '/_anon/verify/$token': {
+      id: '/_anon/verify/$token'
+      path: '/verify/$token'
+      fullPath: '/verify/$token'
+      preLoaderRoute: typeof AnonVerifyTokenImport
+      parentRoute: typeof AnonImport
+    }
   }
 }
 
 // Create and export the route tree
+
+interface AnonRouteChildren {
+  AnonCheckEmailRoute: typeof AnonCheckEmailRoute
+  AnonLoginRoute: typeof AnonLoginRoute
+  AnonSignUpRoute: typeof AnonSignUpRoute
+  AnonAboutLazyRoute: typeof AnonAboutLazyRoute
+  AnonIndexRoute: typeof AnonIndexRoute
+  AnonVerifyTokenRoute: typeof AnonVerifyTokenRoute
+}
+
+const AnonRouteChildren: AnonRouteChildren = {
+  AnonCheckEmailRoute: AnonCheckEmailRoute,
+  AnonLoginRoute: AnonLoginRoute,
+  AnonSignUpRoute: AnonSignUpRoute,
+  AnonAboutLazyRoute: AnonAboutLazyRoute,
+  AnonIndexRoute: AnonIndexRoute,
+  AnonVerifyTokenRoute: AnonVerifyTokenRoute,
+}
+
+const AnonRouteWithChildren = AnonRoute._addFileChildren(AnonRouteChildren)
 
 interface AuthRouteChildren {
   AuthDashboardRoute: typeof AuthDashboardRoute
@@ -108,51 +183,83 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
   '': typeof AuthRouteWithChildren
-  '/login': typeof LoginRoute
-  '/about': typeof AboutLazyRoute
+  '/check-email': typeof AnonCheckEmailRoute
+  '/login': typeof AnonLoginRoute
+  '/sign-up': typeof AnonSignUpRoute
   '/dashboard': typeof AuthDashboardRoute
+  '/about': typeof AnonAboutLazyRoute
+  '/': typeof AnonIndexRoute
+  '/verify/$token': typeof AnonVerifyTokenRoute
 }
 
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '': typeof AuthRouteWithChildren
-  '/login': typeof LoginRoute
-  '/about': typeof AboutLazyRoute
+  '/check-email': typeof AnonCheckEmailRoute
+  '/login': typeof AnonLoginRoute
+  '/sign-up': typeof AnonSignUpRoute
   '/dashboard': typeof AuthDashboardRoute
+  '/about': typeof AnonAboutLazyRoute
+  '/': typeof AnonIndexRoute
+  '/verify/$token': typeof AnonVerifyTokenRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
-  '/': typeof IndexRoute
+  '/_anon': typeof AnonRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
-  '/login': typeof LoginRoute
-  '/about': typeof AboutLazyRoute
+  '/_anon/check-email': typeof AnonCheckEmailRoute
+  '/_anon/login': typeof AnonLoginRoute
+  '/_anon/sign-up': typeof AnonSignUpRoute
   '/_auth/dashboard': typeof AuthDashboardRoute
+  '/_anon/about': typeof AnonAboutLazyRoute
+  '/_anon/': typeof AnonIndexRoute
+  '/_anon/verify/$token': typeof AnonVerifyTokenRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '' | '/login' | '/about' | '/dashboard'
+  fullPaths:
+    | ''
+    | '/check-email'
+    | '/login'
+    | '/sign-up'
+    | '/dashboard'
+    | '/about'
+    | '/'
+    | '/verify/$token'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '' | '/login' | '/about' | '/dashboard'
-  id: '__root__' | '/' | '/_auth' | '/login' | '/about' | '/_auth/dashboard'
+  to:
+    | ''
+    | '/check-email'
+    | '/login'
+    | '/sign-up'
+    | '/dashboard'
+    | '/about'
+    | '/'
+    | '/verify/$token'
+  id:
+    | '__root__'
+    | '/_anon'
+    | '/_auth'
+    | '/_anon/check-email'
+    | '/_anon/login'
+    | '/_anon/sign-up'
+    | '/_auth/dashboard'
+    | '/_anon/about'
+    | '/_anon/'
+    | '/_anon/verify/$token'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AnonRoute: typeof AnonRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
-  LoginRoute: typeof LoginRoute
-  AboutLazyRoute: typeof AboutLazyRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AnonRoute: AnonRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
-  LoginRoute: LoginRoute,
-  AboutLazyRoute: AboutLazyRoute,
 }
 
 export const routeTree = rootRoute
@@ -167,14 +274,20 @@ export const routeTree = rootRoute
     "__root__": {
       "filePath": "__root.tsx",
       "children": [
-        "/",
-        "/_auth",
-        "/login",
-        "/about"
+        "/_anon",
+        "/_auth"
       ]
     },
-    "/": {
-      "filePath": "index.tsx"
+    "/_anon": {
+      "filePath": "_anon.tsx",
+      "children": [
+        "/_anon/check-email",
+        "/_anon/login",
+        "/_anon/sign-up",
+        "/_anon/about",
+        "/_anon/",
+        "/_anon/verify/$token"
+      ]
     },
     "/_auth": {
       "filePath": "_auth.tsx",
@@ -182,15 +295,33 @@ export const routeTree = rootRoute
         "/_auth/dashboard"
       ]
     },
-    "/login": {
-      "filePath": "login.tsx"
+    "/_anon/check-email": {
+      "filePath": "_anon.check-email.tsx",
+      "parent": "/_anon"
     },
-    "/about": {
-      "filePath": "about.lazy.tsx"
+    "/_anon/login": {
+      "filePath": "_anon.login.tsx",
+      "parent": "/_anon"
+    },
+    "/_anon/sign-up": {
+      "filePath": "_anon.sign-up.tsx",
+      "parent": "/_anon"
     },
     "/_auth/dashboard": {
       "filePath": "_auth.dashboard.tsx",
       "parent": "/_auth"
+    },
+    "/_anon/about": {
+      "filePath": "_anon.about.lazy.tsx",
+      "parent": "/_anon"
+    },
+    "/_anon/": {
+      "filePath": "_anon.index.tsx",
+      "parent": "/_anon"
+    },
+    "/_anon/verify/$token": {
+      "filePath": "_anon.verify.$token.tsx",
+      "parent": "/_anon"
     }
   }
 }

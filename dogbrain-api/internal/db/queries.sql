@@ -19,8 +19,8 @@ SET
     token_expiry = NULL
 WHERE 
     verification_token = $2 
-    AND (token_expiry > $3 OR token_expiry IS NULL)
-    AND verified_at IS NULL  -- Only verify unverified users
+    AND (token_expiry > sqlc.arg(now) OR token_expiry IS NULL)
+    AND verified_at IS NULL
 RETURNING *;
 
 -- name: CheckUserExists :one

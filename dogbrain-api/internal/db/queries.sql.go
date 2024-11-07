@@ -85,18 +85,18 @@ SET
 WHERE 
     verification_token = $2 
     AND (token_expiry > $3 OR token_expiry IS NULL)
-    AND verified_at IS NULL  -- Only verify unverified users
+    AND verified_at IS NULL
 RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry
 `
 
 type VerifyUserParams struct {
 	VerifiedAt        sql.NullTime   `json:"verified_at"`
 	VerificationToken sql.NullString `json:"verification_token"`
-	TokenExpiry       sql.NullTime   `json:"token_expiry"`
+	Now               sql.NullTime   `json:"now"`
 }
 
 func (q *Queries) VerifyUser(ctx context.Context, arg VerifyUserParams) (User, error) {
-	row := q.queryRow(ctx, q.verifyUserStmt, verifyUser, arg.VerifiedAt, arg.VerificationToken, arg.TokenExpiry)
+	row := q.queryRow(ctx, q.verifyUserStmt, verifyUser, arg.VerifiedAt, arg.VerificationToken, arg.Now)
 	var i User
 	err := row.Scan(
 		&i.ID,
