@@ -42,3 +42,21 @@ export async function verifyEmail(token: string) {
 
 	return data;
 }
+
+export async function logIn(email: string, password: string) {
+	const res = await fetch(`${API_BASE}/login`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ email, password }),
+	});
+
+	const data = await res.json();
+
+	if (!res.ok) {
+		throw new ApiError(res.status, data.error);
+	}
+
+	return data;
+}

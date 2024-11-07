@@ -6,11 +6,16 @@ package db
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
 	CheckUserExists(ctx context.Context, lower string) (bool, error)
+	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (uuid.UUID, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
+	ResetPassword(ctx context.Context, arg ResetPasswordParams) (uuid.UUID, error)
 	VerifyUser(ctx context.Context, arg VerifyUserParams) (User, error)
 }
 

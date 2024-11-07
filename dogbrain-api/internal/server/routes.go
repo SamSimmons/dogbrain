@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/base64"
 	"fmt"
@@ -47,9 +48,17 @@ func (s *FiberServer) RegisterFiberRoutes() {
 		},
 	})
 	v1 := s.App.Group("/api/v1")
-	auth := v1.Group("/auth", authLimiter)
+	auth := v1.Group("", authLimiter)
+
 	auth.Post("/register", s.registerUser)
 	auth.Get("/verify/:token", s.verifyEmail)
+	auth.Post("/forgot-password", s.forgotPassword)
+	auth.Post("/reset-password", s.resetPassword)
+
+	auth.Post("/login", s.logIn)
+	auth.Post("/logout", s.logOut)
+
+	s.Stack()
 }
 
 func validatePassword(password string) error {
@@ -134,6 +143,7 @@ func (s *FiberServer) registerUser(c *fiber.Ctx) error {
 			"error": "Internal server error",
 		})
 	}
+
 	if exists {
 		// User exists, but we send the same message as success to avoid leaking information
 		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
@@ -141,25 +151,31 @@ func (s *FiberServer) registerUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Generate a random salt
-	salt := make([]byte, saltLen)
-	if _, err := rand.Read(salt); err != nil {
+	// // Generate a random salt
+	// salt := make([]byte, saltLen)
+	// if _, err := rand.Read(salt); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": "Internal server error",
+	// 	})
+	// }
+
+	// // Hash the password using Argon2id
+	// hash := argon2.IDKey(
+	// 	[]byte(input.Password),
+	// 	salt,
+	// 	argonTime,
+	// 	argonMemory,
+	// 	argonThreads,
+	// 	argonKeyLen,
+	// )
+
+	// encodedHash := base64.RawStdEncoding.EncodeToString(append(salt, hash...))
+	encodedHash, err := hashPassword(input.Password)
+	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Internal server error",
 		})
 	}
-
-	// Hash the password using Argon2id
-	hash := argon2.IDKey(
-		[]byte(input.Password),
-		salt,
-		argonTime,
-		argonMemory,
-		argonThreads,
-		argonKeyLen,
-	)
-
-	encodedHash := base64.RawStdEncoding.EncodeToString(append(salt, hash...))
 
 	verificationToken := uuid.New().String()
 	tokenExpiry := time.Now().Add(tokenValidityDuration)
@@ -221,4 +237,276 @@ func (s *FiberServer) verifyEmail(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "Email verified successfully"})
+}
+
+func verifyPassword(storedHash string, password string) (bool, error) {
+	hashBytes, err := base64.RawStdEncoding.DecodeString(storedHash)
+	if err != nil {
+		return false, err
+	}
+
+	salt := hashBytes[:saltLen]
+	storedHashOnly := hashBytes[saltLen:]
+
+	// Use same Argon2id parameters as registration
+	hash := argon2.IDKey(
+		[]byte(password),
+		salt,
+		argonTime,
+		argonMemory,
+		argonThreads,
+		argonKeyLen,
+	)
+
+	return subtle.ConstantTimeCompare(hash, storedHashOnly) == 1, nil
+}
+
+func hashPassword(password string) (string, error) {
+	// Generate salt
+	salt := make([]byte, saltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", fmt.Errorf("error generating salt: %w", err)
+	}
+
+	// Hash the password using Argon2id
+	hash := argon2.IDKey(
+		[]byte(password),
+		salt,
+		argonTime,
+		argonMemory,
+		argonThreads,
+		argonKeyLen,
+	)
+
+	// Encode salt+hash
+	return base64.RawStdEncoding.EncodeToString(append(salt, hash...)), nil
+}
+
+func (s *FiberServer) forgotPassword(c *fiber.Ctx) error {
+	var input struct {
+		Email string `json:"email"`
+	}
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": msgInvalidRequestFormat,
+		})
+	}
+
+	if err := validateEmail(input.Email); err != nil {
+		// Still return success to avoid leaking valid emails
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": msgResetEmailSent,
+		})
+	}
+
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+
+	// Generate reset token
+	resetToken := uuid.New().String()
+	tokenExpiry := time.Now().Add(1 * time.Hour)
+
+	// Update user with reset token
+	_, err := s.DB.CreatePasswordResetToken(context.Background(), db.CreatePasswordResetTokenParams{
+		VerificationToken: sql.NullString{
+			String: resetToken,
+			Valid:  true,
+		},
+		TokenExpiry: sql.NullTime{
+			Time:  tokenExpiry,
+			Valid: true,
+		},
+		Email: email,
+	})
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// User not found - return same message to avoid leaking valid emails
+			return c.Status(fiber.StatusOK).JSON(fiber.Map{
+				"message": msgResetEmailSent,
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	if err := s.Emails.SendPasswordResetEmail(email, resetToken); err != nil {
+		// Log the error but don't expose it to the user
+		fmt.Printf("Failed to send password reset email: %v\n", err)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": msgResetEmailSent,
+	})
+}
+
+func (s *FiberServer) resetPassword(c *fiber.Ctx) error {
+	var input struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": msgInvalidRequestFormat,
+		})
+	}
+
+	if err := validatePassword(input.Password); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
+	// // Generate salt and hash password
+	// salt := make([]byte, saltLen)
+	// if _, err := rand.Read(salt); err != nil {
+	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+	// 		"error": msgServerError,
+	// 	})
+	// }
+
+	// hash := argon2.IDKey(
+	// 	[]byte(input.Password),
+	// 	salt,
+	// 	argonTime,
+	// 	argonMemory,
+	// 	argonThreads,
+	// 	argonKeyLen,
+	// )
+
+	// encodedHash := base64.RawStdEncoding.EncodeToString(append(salt, hash...))
+	encodedHash, err := hashPassword(input.Password)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	// Update password and invalidate token
+	_, err = s.DB.ResetPassword(context.Background(), db.ResetPasswordParams{
+		Password: encodedHash,
+		VerificationToken: sql.NullString{
+			String: input.Token,
+			Valid:  true,
+		},
+	})
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "Invalid or expired reset token",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": msgPasswordReset,
+	})
+}
+
+func (s *FiberServer) logIn(c *fiber.Ctx) error {
+	start := time.Now()
+	defer func() {
+		elapsed := time.Since(start)
+		if elapsed < time.Second {
+			time.Sleep(time.Second - elapsed)
+		}
+	}()
+
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := c.BodyParser(&input); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": msgInvalidRequestFormat,
+		})
+	}
+
+	if err := validateEmail(input.Email); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": msgInvalidCredentials,
+		})
+	}
+	if err := validatePassword(input.Password); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": msgInvalidCredentials,
+		})
+	}
+
+	email := strings.ToLower(strings.TrimSpace(input.Email))
+
+	user, err := s.DB.GetUserByEmail(context.Background(), email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": msgInvalidCredentials,
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	valid, err := verifyPassword(user.Password, input.Password)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	if !valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": msgInvalidCredentials,
+		})
+	}
+
+	if !user.VerifiedAt.Valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": msgUnverifiedEmail,
+		})
+	}
+
+	sess, err := s.Sessions.Get(c)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	sess.Set("user_id", user.ID.String())
+	if err := sess.Save(); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": msgServerError,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": msgLoginSuccess,
+	})
+}
+
+func (s *FiberServer) logOut(c *fiber.Ctx) error {
+	sess, err := s.Sessions.Get(c)
+	if err != nil {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": msgLogoutSuccess,
+		})
+	}
+
+	if err := sess.Destroy(); err != nil {
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"message": msgLogoutSuccess,
+		})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"message": msgLogoutSuccess,
+	})
 }

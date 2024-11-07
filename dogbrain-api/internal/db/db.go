@@ -27,8 +27,17 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.checkUserExistsStmt, err = db.PrepareContext(ctx, checkUserExists); err != nil {
 		return nil, fmt.Errorf("error preparing query CheckUserExists: %w", err)
 	}
+	if q.createPasswordResetTokenStmt, err = db.PrepareContext(ctx, createPasswordResetToken); err != nil {
+		return nil, fmt.Errorf("error preparing query CreatePasswordResetToken: %w", err)
+	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
+	}
+	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
+		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
+	}
+	if q.resetPasswordStmt, err = db.PrepareContext(ctx, resetPassword); err != nil {
+		return nil, fmt.Errorf("error preparing query ResetPassword: %w", err)
 	}
 	if q.verifyUserStmt, err = db.PrepareContext(ctx, verifyUser); err != nil {
 		return nil, fmt.Errorf("error preparing query VerifyUser: %w", err)
@@ -43,9 +52,24 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing checkUserExistsStmt: %w", cerr)
 		}
 	}
+	if q.createPasswordResetTokenStmt != nil {
+		if cerr := q.createPasswordResetTokenStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createPasswordResetTokenStmt: %w", cerr)
+		}
+	}
 	if q.createUserStmt != nil {
 		if cerr := q.createUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
+		}
+	}
+	if q.getUserByEmailStmt != nil {
+		if cerr := q.getUserByEmailStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getUserByEmailStmt: %w", cerr)
+		}
+	}
+	if q.resetPasswordStmt != nil {
+		if cerr := q.resetPasswordStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing resetPasswordStmt: %w", cerr)
 		}
 	}
 	if q.verifyUserStmt != nil {
@@ -90,19 +114,25 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                  DBTX
-	tx                  *sql.Tx
-	checkUserExistsStmt *sql.Stmt
-	createUserStmt      *sql.Stmt
-	verifyUserStmt      *sql.Stmt
+	db                           DBTX
+	tx                           *sql.Tx
+	checkUserExistsStmt          *sql.Stmt
+	createPasswordResetTokenStmt *sql.Stmt
+	createUserStmt               *sql.Stmt
+	getUserByEmailStmt           *sql.Stmt
+	resetPasswordStmt            *sql.Stmt
+	verifyUserStmt               *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                  tx,
-		tx:                  tx,
-		checkUserExistsStmt: q.checkUserExistsStmt,
-		createUserStmt:      q.createUserStmt,
-		verifyUserStmt:      q.verifyUserStmt,
+		db:                           tx,
+		tx:                           tx,
+		checkUserExistsStmt:          q.checkUserExistsStmt,
+		createPasswordResetTokenStmt: q.createPasswordResetTokenStmt,
+		createUserStmt:               q.createUserStmt,
+		getUserByEmailStmt:           q.getUserByEmailStmt,
+		resetPasswordStmt:            q.resetPasswordStmt,
+		verifyUserStmt:               q.verifyUserStmt,
 	}
 }

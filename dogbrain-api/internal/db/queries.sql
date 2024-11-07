@@ -29,3 +29,26 @@ SELECT EXISTS(
     FROM users 
     WHERE LOWER(email) = LOWER($1)
 ) AS exists;
+
+-- name: GetUserByEmail :one
+SELECT * FROM users WHERE email = $1 LIMIT 1;
+
+-- name: CreatePasswordResetToken :one
+UPDATE users 
+SET verification_token = $1,
+    token_expiry = $2,
+    updated_at = NOW()
+WHERE email = $3 
+  AND verified_at IS NOT NULL
+RETURNING id;
+
+-- name: ResetPassword :one
+UPDATE users 
+SET password = $1,
+    verification_token = NULL,
+    token_expiry = NULL,
+    updated_at = NOW()
+WHERE verification_token = $2 
+  AND token_expiry > NOW()
+  AND verified_at IS NOT NULL
+RETURNING id;

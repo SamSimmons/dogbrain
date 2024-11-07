@@ -1,92 +1,139 @@
-import { type FormEvent, useState } from 'react'
 import {
-  createFileRoute,
-  redirect,
-  useRouter,
-  useRouterState,
-} from '@tanstack/react-router'
-import { z } from 'zod'
+	createFileRoute,
+	Link,
+	useNavigate,
+	useRouter,
+} from "@tanstack/react-router";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 
-import { useAuth } from '@/hooks/useAuth'
+import { Button } from "@/components/ui/button";
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Heading, Text } from "@/components/ui/typography";
+import { ApiError, logIn } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-const fallback = '/dashboard' as const
+export const Route = createFileRoute("/_anon/login")({
+	validateSearch: z.object({
+		redirect: z.string().optional(),
+	}),
+	component: LogInComponent,
+});
 
-export const Route = createFileRoute('/_anon/login')({
-  validateSearch: z.object({
-    redirect: z.string().optional().catch(''),
-  }),
-  beforeLoad: ({ context, search }) => {
-    if (context.auth.isAuthenticated) {
-      throw redirect({ to: search.redirect || fallback })
-    }
-  },
-  component: LoginComponent,
-})
+const loginSchema = z.object({
+	email: z
+		.string()
+		.trim()
+		.min(1, "Email is required")
+		.max(255, "Email must not exceed 255 characters")
+		.email("Invalid email address"),
+	password: z
+		.string()
+		.min(8, "Password must be at least 8 characters long")
+		.max(128, "Password must not exceed 128 characters"),
+});
 
-function LoginComponent() {
-  const auth = useAuth()
-  const router = useRouter()
-  const isLoading = useRouterState({ select: (s) => s.isLoading })
-  const navigate = Route.useNavigate()
-  const [isSubmitting, setIsSubmitting] = useState(false)
+type LogInSchema = z.infer<typeof loginSchema>;
 
-  const search = Route.useSearch()
+function LogInComponent() {
+	const { login } = useAuth();
+	const navigate = useNavigate();
+	const router = useRouter();
+	const { redirect } = Route.useSearch();
 
-  const onFormSubmit = async (evt: FormEvent<HTMLFormElement>) => {
-    setIsSubmitting(true)
-    try {
-      evt.preventDefault()
-      const data = new FormData(evt.currentTarget)
-      const fieldValue = data.get('username')
+	const mutation = useMutation({
+		mutationFn: (values: LogInSchema) => logIn(values.email, values.password),
+		onSuccess: async (_response, values) => {
+			await login(values.email);
+			await router.invalidate();
+			await new Promise((r) => setTimeout(r, 1));
+			navigate({ to: redirect ?? "/dashboard" });
+		},
+	});
 
-      if (!fieldValue) return
-      const username = fieldValue.toString()
-      await auth.login(username)
+	const form = useForm<LogInSchema>({
+		resolver: zodResolver(loginSchema),
+		defaultValues: {
+			email: "",
+			password: "",
+		},
+	});
 
-      await router.invalidate()
+	function onSubmit(values: LogInSchema) {
+		mutation.mutate(values);
+	}
 
-      await navigate({ to: search.redirect || fallback })
-    } catch (error) {
-      console.error('Error logging in: ', error)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
+	return (
+		<div className="grid place-items-center grow">
+			<div className="flex flex-col gap-2">
+				<Heading size="lg">Log In</Heading>
+				<Text variant="muted">
+					Don't have an account? <Link to="/sign-up">Sign up.</Link>
+				</Text>
 
-  const isLoggingIn = isLoading || isSubmitting
+				{mutation.isError && (
+					<Alert variant="destructive">
+						<AlertDescription>
+							{mutation.error instanceof ApiError
+								? mutation.error.message
+								: "Something went wrong. Please try again."}
+						</AlertDescription>
+					</Alert>
+				)}
 
-  return (
-    <div className="p-2 grid gap-2 place-items-center">
-      <h3 className="text-xl">Login page</h3>
-      {search.redirect ? (
-        <p className="text-red-500">You need to login to access this page.</p>
-      ) : (
-        <p>Login to see all the cool content in here.</p>
-      )}
-      <form className="mt-4 max-w-lg" onSubmit={onFormSubmit}>
-        <fieldset disabled={isLoggingIn} className="w-full grid gap-2">
-          <div className="grid gap-2 items-center min-w-[300px]">
-            <label htmlFor="username-input" className="text-sm font-medium">
-              Username
-            </label>
-            <input
-              id="username-input"
-              name="username"
-              placeholder="Enter your name"
-              type="text"
-              className="border rounded-md p-2 w-full"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            className="bg-blue-500 text-white py-2 px-4 rounded-md w-full disabled:bg-gray-300 disabled:text-gray-500"
-          >
-            {isLoggingIn ? 'Loading...' : 'Login'}
-          </button>
-        </fieldset>
-      </form>
-    </div>
-  )
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+						<FormField
+							control={form.control}
+							name="email"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Email</FormLabel>
+									<FormControl>
+										<Input
+											placeholder="email"
+											autoComplete="email"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<FormField
+							control={form.control}
+							name="password"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											autoComplete="current-password"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<Button type="submit" disabled={mutation.isPending}>
+							{mutation.isPending ? "Logging In..." : "Log In"}
+						</Button>
+					</form>
+				</Form>
+			</div>
+		</div>
+	);
 }
