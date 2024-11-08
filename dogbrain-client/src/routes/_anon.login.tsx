@@ -128,6 +128,9 @@ function LogInComponent() {
 								</FormItem>
 							)}
 						/>
+						<Text variant="muted">
+							Forgot your password? <Link to="/forgot-password">Reset</Link>
+						</Text>
 						<Button type="submit" disabled={mutation.isPending}>
 							{mutation.isPending ? "Logging In..." : "Log In"}
 						</Button>

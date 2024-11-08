@@ -19,8 +19,10 @@ import { Route as AnonIndexImport } from './routes/_anon.index'
 import { Route as AuthDashboardImport } from './routes/_auth.dashboard'
 import { Route as AnonSignUpImport } from './routes/_anon.sign-up'
 import { Route as AnonLoginImport } from './routes/_anon.login'
+import { Route as AnonForgotPasswordImport } from './routes/_anon.forgot-password'
 import { Route as AnonCheckEmailImport } from './routes/_anon.check-email'
 import { Route as AnonVerifyTokenImport } from './routes/_anon.verify.$token'
+import { Route as AnonResetPasswordTokenImport } from './routes/_anon.reset-password.$token'
 
 // Create Virtual Routes
 
@@ -68,6 +70,12 @@ const AnonLoginRoute = AnonLoginImport.update({
   getParentRoute: () => AnonRoute,
 } as any)
 
+const AnonForgotPasswordRoute = AnonForgotPasswordImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
+  getParentRoute: () => AnonRoute,
+} as any)
+
 const AnonCheckEmailRoute = AnonCheckEmailImport.update({
   id: '/check-email',
   path: '/check-email',
@@ -77,6 +85,12 @@ const AnonCheckEmailRoute = AnonCheckEmailImport.update({
 const AnonVerifyTokenRoute = AnonVerifyTokenImport.update({
   id: '/verify/$token',
   path: '/verify/$token',
+  getParentRoute: () => AnonRoute,
+} as any)
+
+const AnonResetPasswordTokenRoute = AnonResetPasswordTokenImport.update({
+  id: '/reset-password/$token',
+  path: '/reset-password/$token',
   getParentRoute: () => AnonRoute,
 } as any)
 
@@ -103,6 +117,13 @@ declare module '@tanstack/react-router' {
       path: '/check-email'
       fullPath: '/check-email'
       preLoaderRoute: typeof AnonCheckEmailImport
+      parentRoute: typeof AnonImport
+    }
+    '/_anon/forgot-password': {
+      id: '/_anon/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof AnonForgotPasswordImport
       parentRoute: typeof AnonImport
     }
     '/_anon/login': {
@@ -140,6 +161,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AnonIndexImport
       parentRoute: typeof AnonImport
     }
+    '/_anon/reset-password/$token': {
+      id: '/_anon/reset-password/$token'
+      path: '/reset-password/$token'
+      fullPath: '/reset-password/$token'
+      preLoaderRoute: typeof AnonResetPasswordTokenImport
+      parentRoute: typeof AnonImport
+    }
     '/_anon/verify/$token': {
       id: '/_anon/verify/$token'
       path: '/verify/$token'
@@ -154,19 +182,23 @@ declare module '@tanstack/react-router' {
 
 interface AnonRouteChildren {
   AnonCheckEmailRoute: typeof AnonCheckEmailRoute
+  AnonForgotPasswordRoute: typeof AnonForgotPasswordRoute
   AnonLoginRoute: typeof AnonLoginRoute
   AnonSignUpRoute: typeof AnonSignUpRoute
   AnonAboutLazyRoute: typeof AnonAboutLazyRoute
   AnonIndexRoute: typeof AnonIndexRoute
+  AnonResetPasswordTokenRoute: typeof AnonResetPasswordTokenRoute
   AnonVerifyTokenRoute: typeof AnonVerifyTokenRoute
 }
 
 const AnonRouteChildren: AnonRouteChildren = {
   AnonCheckEmailRoute: AnonCheckEmailRoute,
+  AnonForgotPasswordRoute: AnonForgotPasswordRoute,
   AnonLoginRoute: AnonLoginRoute,
   AnonSignUpRoute: AnonSignUpRoute,
   AnonAboutLazyRoute: AnonAboutLazyRoute,
   AnonIndexRoute: AnonIndexRoute,
+  AnonResetPasswordTokenRoute: AnonResetPasswordTokenRoute,
   AnonVerifyTokenRoute: AnonVerifyTokenRoute,
 }
 
@@ -185,22 +217,26 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 export interface FileRoutesByFullPath {
   '': typeof AuthRouteWithChildren
   '/check-email': typeof AnonCheckEmailRoute
+  '/forgot-password': typeof AnonForgotPasswordRoute
   '/login': typeof AnonLoginRoute
   '/sign-up': typeof AnonSignUpRoute
   '/dashboard': typeof AuthDashboardRoute
   '/about': typeof AnonAboutLazyRoute
   '/': typeof AnonIndexRoute
+  '/reset-password/$token': typeof AnonResetPasswordTokenRoute
   '/verify/$token': typeof AnonVerifyTokenRoute
 }
 
 export interface FileRoutesByTo {
   '': typeof AuthRouteWithChildren
   '/check-email': typeof AnonCheckEmailRoute
+  '/forgot-password': typeof AnonForgotPasswordRoute
   '/login': typeof AnonLoginRoute
   '/sign-up': typeof AnonSignUpRoute
   '/dashboard': typeof AuthDashboardRoute
   '/about': typeof AnonAboutLazyRoute
   '/': typeof AnonIndexRoute
+  '/reset-password/$token': typeof AnonResetPasswordTokenRoute
   '/verify/$token': typeof AnonVerifyTokenRoute
 }
 
@@ -209,11 +245,13 @@ export interface FileRoutesById {
   '/_anon': typeof AnonRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
   '/_anon/check-email': typeof AnonCheckEmailRoute
+  '/_anon/forgot-password': typeof AnonForgotPasswordRoute
   '/_anon/login': typeof AnonLoginRoute
   '/_anon/sign-up': typeof AnonSignUpRoute
   '/_auth/dashboard': typeof AuthDashboardRoute
   '/_anon/about': typeof AnonAboutLazyRoute
   '/_anon/': typeof AnonIndexRoute
+  '/_anon/reset-password/$token': typeof AnonResetPasswordTokenRoute
   '/_anon/verify/$token': typeof AnonVerifyTokenRoute
 }
 
@@ -222,32 +260,38 @@ export interface FileRouteTypes {
   fullPaths:
     | ''
     | '/check-email'
+    | '/forgot-password'
     | '/login'
     | '/sign-up'
     | '/dashboard'
     | '/about'
     | '/'
+    | '/reset-password/$token'
     | '/verify/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | ''
     | '/check-email'
+    | '/forgot-password'
     | '/login'
     | '/sign-up'
     | '/dashboard'
     | '/about'
     | '/'
+    | '/reset-password/$token'
     | '/verify/$token'
   id:
     | '__root__'
     | '/_anon'
     | '/_auth'
     | '/_anon/check-email'
+    | '/_anon/forgot-password'
     | '/_anon/login'
     | '/_anon/sign-up'
     | '/_auth/dashboard'
     | '/_anon/about'
     | '/_anon/'
+    | '/_anon/reset-password/$token'
     | '/_anon/verify/$token'
   fileRoutesById: FileRoutesById
 }
@@ -282,10 +326,12 @@ export const routeTree = rootRoute
       "filePath": "_anon.tsx",
       "children": [
         "/_anon/check-email",
+        "/_anon/forgot-password",
         "/_anon/login",
         "/_anon/sign-up",
         "/_anon/about",
         "/_anon/",
+        "/_anon/reset-password/$token",
         "/_anon/verify/$token"
       ]
     },
@@ -297,6 +343,10 @@ export const routeTree = rootRoute
     },
     "/_anon/check-email": {
       "filePath": "_anon.check-email.tsx",
+      "parent": "/_anon"
+    },
+    "/_anon/forgot-password": {
+      "filePath": "_anon.forgot-password.tsx",
       "parent": "/_anon"
     },
     "/_anon/login": {
@@ -317,6 +367,10 @@ export const routeTree = rootRoute
     },
     "/_anon/": {
       "filePath": "_anon.index.tsx",
+      "parent": "/_anon"
+    },
+    "/_anon/reset-password/$token": {
+      "filePath": "_anon.reset-password.$token.tsx",
       "parent": "/_anon"
     },
     "/_anon/verify/$token": {

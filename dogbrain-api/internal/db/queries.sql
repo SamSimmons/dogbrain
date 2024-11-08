@@ -52,3 +52,37 @@ WHERE verification_token = $2
   AND token_expiry > NOW()
   AND verified_at IS NOT NULL
 RETURNING id;
+
+-- name: CreateSession :exec
+INSERT INTO sessions (
+    id,
+    user_id,
+    data,
+    expires_at,
+    created_at
+) VALUES (
+    $1, $2, $3, $4, NOW()
+);
+
+-- name: GetSession :one
+SELECT data 
+FROM sessions 
+WHERE id = $1 AND expires_at > NOW();
+
+-- name: UpdateSession :exec
+UPDATE sessions 
+SET data = $2,
+    expires_at = $3
+WHERE id = $1;
+
+-- name: DeleteSession :exec
+DELETE FROM sessions 
+WHERE id = $1;
+
+-- name: DeleteUserSessions :exec
+DELETE FROM sessions 
+WHERE user_id = $1;
+
+-- name: DeleteExpiredSessions :exec
+DELETE FROM sessions 
+WHERE expires_at < NOW();

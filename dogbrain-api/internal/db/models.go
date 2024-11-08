@@ -11,6 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type Session struct {
+	ID        string        `json:"id"`
+	UserID    uuid.NullUUID `json:"user_id"`
+	Data      string        `json:"data"`
+	ExpiresAt time.Time     `json:"expires_at"`
+	CreatedAt time.Time     `json:"created_at"`
+}
+
 type User struct {
 	ID                uuid.UUID      `json:"id"`
 	Email             string         `json:"email"`

@@ -2,12 +2,10 @@ package server
 
 import (
 	"dogbrain-api/internal/db"
-	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
-	"github.com/gofiber/storage/postgres/v3"
 )
 
 type FiberServer struct {
@@ -29,13 +27,13 @@ const (
 )
 
 func New(postmarkToken, accountToken, fromEmail string) *FiberServer {
-	storage := postgres.New(postgres.Config{
-		ConnectionURI: os.Getenv("DATABASE_URL"),
-		Reset:         false,
-	})
+	dbConn := db.NewDB()
+	queries := db.New(dbConn.DB)
+
+	sessionStorage := NewSessionStorage(queries)
 
 	sessionStore := session.New(session.Config{
-		Storage:        storage,
+		Storage:        sessionStorage,
 		Expiration:     30 * 24 * time.Hour,
 		KeyLookup:      "cookie:session",
 		CookieHTTPOnly: true,
@@ -49,7 +47,7 @@ func New(postmarkToken, accountToken, fromEmail string) *FiberServer {
 			ServerHeader: "dogbrain-api",
 			AppName:      "dogbrain-api",
 		}),
-		DB:       db.NewDB(),
+		DB:       dbConn,
 		Emails:   NewEmailService(postmarkToken, accountToken, fromEmail),
 		Sessions: sessionStore,
 	}

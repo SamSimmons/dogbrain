@@ -151,25 +151,6 @@ func (s *FiberServer) registerUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// // Generate a random salt
-	// salt := make([]byte, saltLen)
-	// if _, err := rand.Read(salt); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": "Internal server error",
-	// 	})
-	// }
-
-	// // Hash the password using Argon2id
-	// hash := argon2.IDKey(
-	// 	[]byte(input.Password),
-	// 	salt,
-	// 	argonTime,
-	// 	argonMemory,
-	// 	argonThreads,
-	// 	argonKeyLen,
-	// )
-
-	// encodedHash := base64.RawStdEncoding.EncodeToString(append(salt, hash...))
 	encodedHash, err := hashPassword(input.Password)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -359,24 +340,6 @@ func (s *FiberServer) resetPassword(c *fiber.Ctx) error {
 		})
 	}
 
-	// // Generate salt and hash password
-	// salt := make([]byte, saltLen)
-	// if _, err := rand.Read(salt); err != nil {
-	// 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-	// 		"error": msgServerError,
-	// 	})
-	// }
-
-	// hash := argon2.IDKey(
-	// 	[]byte(input.Password),
-	// 	salt,
-	// 	argonTime,
-	// 	argonMemory,
-	// 	argonThreads,
-	// 	argonKeyLen,
-	// )
-
-	// encodedHash := base64.RawStdEncoding.EncodeToString(append(salt, hash...))
 	encodedHash, err := hashPassword(input.Password)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -385,7 +348,7 @@ func (s *FiberServer) resetPassword(c *fiber.Ctx) error {
 	}
 
 	// Update password and invalidate token
-	_, err = s.DB.ResetPassword(context.Background(), db.ResetPasswordParams{
+	userID, err := s.DB.ResetPassword(context.Background(), db.ResetPasswordParams{
 		Password: encodedHash,
 		VerificationToken: sql.NullString{
 			String: input.Token,
@@ -402,6 +365,11 @@ func (s *FiberServer) resetPassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": msgServerError,
 		})
+	}
+
+	if err := s.Sessions.Storage.(*SessionStorage).DeleteUserSessions(userID); err != nil {
+		// Log the error but don't fail the password reset
+		fmt.Printf("Failed to delete user sessions during password reset: %v\n", err)
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -481,6 +449,7 @@ func (s *FiberServer) logIn(c *fiber.Ctx) error {
 	}
 
 	sess.Set("user_id", user.ID.String())
+
 	if err := sess.Save(); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": msgServerError,

@@ -51,6 +51,35 @@ func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswo
 	return id, err
 }
 
+const createSession = `-- name: CreateSession :exec
+INSERT INTO sessions (
+    id,
+    user_id,
+    data,
+    expires_at,
+    created_at
+) VALUES (
+    $1, $2, $3, $4, NOW()
+)
+`
+
+type CreateSessionParams struct {
+	ID        string        `json:"id"`
+	UserID    uuid.NullUUID `json:"user_id"`
+	Data      string        `json:"data"`
+	ExpiresAt time.Time     `json:"expires_at"`
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
+	_, err := q.exec(ctx, q.createSessionStmt, createSession,
+		arg.ID,
+		arg.UserID,
+		arg.Data,
+		arg.ExpiresAt,
+	)
+	return err
+}
+
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
     id, 
@@ -99,6 +128,49 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
+DELETE FROM sessions 
+WHERE expires_at < NOW()
+`
+
+func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
+	_, err := q.exec(ctx, q.deleteExpiredSessionsStmt, deleteExpiredSessions)
+	return err
+}
+
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions 
+WHERE id = $1
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, id string) error {
+	_, err := q.exec(ctx, q.deleteSessionStmt, deleteSession, id)
+	return err
+}
+
+const deleteUserSessions = `-- name: DeleteUserSessions :exec
+DELETE FROM sessions 
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteUserSessions(ctx context.Context, userID uuid.NullUUID) error {
+	_, err := q.exec(ctx, q.deleteUserSessionsStmt, deleteUserSessions, userID)
+	return err
+}
+
+const getSession = `-- name: GetSession :one
+SELECT data 
+FROM sessions 
+WHERE id = $1 AND expires_at > NOW()
+`
+
+func (q *Queries) GetSession(ctx context.Context, id string) (string, error) {
+	row := q.queryRow(ctx, q.getSessionStmt, getSession, id)
+	var data string
+	err := row.Scan(&data)
+	return data, err
+}
+
 const getUserByEmail = `-- name: GetUserByEmail :one
 SELECT id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry FROM users WHERE email = $1 LIMIT 1
 `
@@ -141,6 +213,24 @@ func (q *Queries) ResetPassword(ctx context.Context, arg ResetPasswordParams) (u
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err
+}
+
+const updateSession = `-- name: UpdateSession :exec
+UPDATE sessions 
+SET data = $2,
+    expires_at = $3
+WHERE id = $1
+`
+
+type UpdateSessionParams struct {
+	ID        string    `json:"id"`
+	Data      string    `json:"data"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (q *Queries) UpdateSession(ctx context.Context, arg UpdateSessionParams) error {
+	_, err := q.exec(ctx, q.updateSessionStmt, updateSession, arg.ID, arg.Data, arg.ExpiresAt)
+	return err
 }
 
 const verifyUser = `-- name: VerifyUser :one

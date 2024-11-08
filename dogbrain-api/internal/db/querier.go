@@ -13,9 +13,15 @@ import (
 type Querier interface {
 	CheckUserExists(ctx context.Context, lower string) (bool, error)
 	CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (uuid.UUID, error)
+	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteExpiredSessions(ctx context.Context) error
+	DeleteSession(ctx context.Context, id string) error
+	DeleteUserSessions(ctx context.Context, userID uuid.NullUUID) error
+	GetSession(ctx context.Context, id string) (string, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	ResetPassword(ctx context.Context, arg ResetPasswordParams) (uuid.UUID, error)
+	UpdateSession(ctx context.Context, arg UpdateSessionParams) error
 	VerifyUser(ctx context.Context, arg VerifyUserParams) (User, error)
 }
 

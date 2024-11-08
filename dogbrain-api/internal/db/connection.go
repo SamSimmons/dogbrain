@@ -25,8 +25,15 @@ func NewDB() *DB {
 
 	log.Printf("Connected to database")
 
-	return &DB{
+	dbInstance := &DB{
 		DB:      db,
 		Queries: New(db),
 	}
+
+	if err := dbInstance.RunMigrations(); err != nil {
+		log.Fatalf("Error running migrations: %v", err)
+	}
+	log.Printf("Database migrations completed")
+
+	return dbInstance
 }

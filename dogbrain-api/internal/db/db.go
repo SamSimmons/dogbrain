@@ -30,14 +30,32 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createPasswordResetTokenStmt, err = db.PrepareContext(ctx, createPasswordResetToken); err != nil {
 		return nil, fmt.Errorf("error preparing query CreatePasswordResetToken: %w", err)
 	}
+	if q.createSessionStmt, err = db.PrepareContext(ctx, createSession); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateSession: %w", err)
+	}
 	if q.createUserStmt, err = db.PrepareContext(ctx, createUser); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateUser: %w", err)
+	}
+	if q.deleteExpiredSessionsStmt, err = db.PrepareContext(ctx, deleteExpiredSessions); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteExpiredSessions: %w", err)
+	}
+	if q.deleteSessionStmt, err = db.PrepareContext(ctx, deleteSession); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteSession: %w", err)
+	}
+	if q.deleteUserSessionsStmt, err = db.PrepareContext(ctx, deleteUserSessions); err != nil {
+		return nil, fmt.Errorf("error preparing query DeleteUserSessions: %w", err)
+	}
+	if q.getSessionStmt, err = db.PrepareContext(ctx, getSession); err != nil {
+		return nil, fmt.Errorf("error preparing query GetSession: %w", err)
 	}
 	if q.getUserByEmailStmt, err = db.PrepareContext(ctx, getUserByEmail); err != nil {
 		return nil, fmt.Errorf("error preparing query GetUserByEmail: %w", err)
 	}
 	if q.resetPasswordStmt, err = db.PrepareContext(ctx, resetPassword); err != nil {
 		return nil, fmt.Errorf("error preparing query ResetPassword: %w", err)
+	}
+	if q.updateSessionStmt, err = db.PrepareContext(ctx, updateSession); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateSession: %w", err)
 	}
 	if q.verifyUserStmt, err = db.PrepareContext(ctx, verifyUser); err != nil {
 		return nil, fmt.Errorf("error preparing query VerifyUser: %w", err)
@@ -57,9 +75,34 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createPasswordResetTokenStmt: %w", cerr)
 		}
 	}
+	if q.createSessionStmt != nil {
+		if cerr := q.createSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createSessionStmt: %w", cerr)
+		}
+	}
 	if q.createUserStmt != nil {
 		if cerr := q.createUserStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing createUserStmt: %w", cerr)
+		}
+	}
+	if q.deleteExpiredSessionsStmt != nil {
+		if cerr := q.deleteExpiredSessionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteExpiredSessionsStmt: %w", cerr)
+		}
+	}
+	if q.deleteSessionStmt != nil {
+		if cerr := q.deleteSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteSessionStmt: %w", cerr)
+		}
+	}
+	if q.deleteUserSessionsStmt != nil {
+		if cerr := q.deleteUserSessionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing deleteUserSessionsStmt: %w", cerr)
+		}
+	}
+	if q.getSessionStmt != nil {
+		if cerr := q.getSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getSessionStmt: %w", cerr)
 		}
 	}
 	if q.getUserByEmailStmt != nil {
@@ -70,6 +113,11 @@ func (q *Queries) Close() error {
 	if q.resetPasswordStmt != nil {
 		if cerr := q.resetPasswordStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing resetPasswordStmt: %w", cerr)
+		}
+	}
+	if q.updateSessionStmt != nil {
+		if cerr := q.updateSessionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateSessionStmt: %w", cerr)
 		}
 	}
 	if q.verifyUserStmt != nil {
@@ -118,9 +166,15 @@ type Queries struct {
 	tx                           *sql.Tx
 	checkUserExistsStmt          *sql.Stmt
 	createPasswordResetTokenStmt *sql.Stmt
+	createSessionStmt            *sql.Stmt
 	createUserStmt               *sql.Stmt
+	deleteExpiredSessionsStmt    *sql.Stmt
+	deleteSessionStmt            *sql.Stmt
+	deleteUserSessionsStmt       *sql.Stmt
+	getSessionStmt               *sql.Stmt
 	getUserByEmailStmt           *sql.Stmt
 	resetPasswordStmt            *sql.Stmt
+	updateSessionStmt            *sql.Stmt
 	verifyUserStmt               *sql.Stmt
 }
 
@@ -130,9 +184,15 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                           tx,
 		checkUserExistsStmt:          q.checkUserExistsStmt,
 		createPasswordResetTokenStmt: q.createPasswordResetTokenStmt,
+		createSessionStmt:            q.createSessionStmt,
 		createUserStmt:               q.createUserStmt,
+		deleteExpiredSessionsStmt:    q.deleteExpiredSessionsStmt,
+		deleteSessionStmt:            q.deleteSessionStmt,
+		deleteUserSessionsStmt:       q.deleteUserSessionsStmt,
+		getSessionStmt:               q.getSessionStmt,
 		getUserByEmailStmt:           q.getUserByEmailStmt,
 		resetPasswordStmt:            q.resetPasswordStmt,
+		updateSessionStmt:            q.updateSessionStmt,
 		verifyUserStmt:               q.verifyUserStmt,
 	}
 }

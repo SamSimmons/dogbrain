@@ -1,3 +1,4 @@
+import { logOut } from "@/lib/api";
 import {
 	type ReactNode,
 	createContext,
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 	const isAuthenticated = !!user;
 
 	const logout = useCallback(async () => {
+		await logOut();
 		setStoredUser(null);
 		setUser(null);
 	}, []);
