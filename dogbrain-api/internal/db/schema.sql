@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMP NOT NULL,
     verification_token VARCHAR(255),
     verified_at TIMESTAMP,
-    token_expiry TIMESTAMP WITH TIME ZONE
+    token_expiry TIMESTAMP WITH TIME ZONE,
+    role VARCHAR(50) NOT NULL DEFAULT 'pending_customer'
 );
 
 CREATE TABLE IF NOT EXISTS sessions (

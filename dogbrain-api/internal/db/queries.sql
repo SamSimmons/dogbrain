@@ -6,9 +6,10 @@ INSERT INTO users (
     created_at, 
     updated_at, 
     verification_token, 
-    token_expiry
+    token_expiry,
+    role
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
+    $1, $2, $3, $4, $5, $6, $7, $8
 ) RETURNING *;
 
 -- name: VerifyUser :one

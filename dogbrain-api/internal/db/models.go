@@ -28,4 +28,5 @@ type User struct {
 	VerificationToken sql.NullString `json:"verification_token"`
 	VerifiedAt        sql.NullTime   `json:"verified_at"`
 	TokenExpiry       sql.NullTime   `json:"token_expiry"`
+	Role              string         `json:"role"`
 }

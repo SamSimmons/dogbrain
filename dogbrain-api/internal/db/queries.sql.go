@@ -88,10 +88,11 @@ INSERT INTO users (
     created_at, 
     updated_at, 
     verification_token, 
-    token_expiry
+    token_expiry,
+    role
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7
-) RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry
+    $1, $2, $3, $4, $5, $6, $7, $8
+) RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry, role
 `
 
 type CreateUserParams struct {
@@ -102,6 +103,7 @@ type CreateUserParams struct {
 	UpdatedAt         time.Time      `json:"updated_at"`
 	VerificationToken sql.NullString `json:"verification_token"`
 	TokenExpiry       sql.NullTime   `json:"token_expiry"`
+	Role              string         `json:"role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -113,6 +115,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.UpdatedAt,
 		arg.VerificationToken,
 		arg.TokenExpiry,
+		arg.Role,
 	)
 	var i User
 	err := row.Scan(
@@ -124,6 +127,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.VerificationToken,
 		&i.VerifiedAt,
 		&i.TokenExpiry,
+		&i.Role,
 	)
 	return i, err
 }
@@ -172,7 +176,7 @@ func (q *Queries) GetSession(ctx context.Context, id string) (string, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry FROM users WHERE email = $1 LIMIT 1
+SELECT id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry, role FROM users WHERE email = $1 LIMIT 1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -187,6 +191,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.VerificationToken,
 		&i.VerifiedAt,
 		&i.TokenExpiry,
+		&i.Role,
 	)
 	return i, err
 }
@@ -243,7 +248,7 @@ WHERE
     verification_token = $2 
     AND (token_expiry > $3 OR token_expiry IS NULL)
     AND verified_at IS NULL
-RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry
+RETURNING id, email, password, created_at, updated_at, verification_token, verified_at, token_expiry, role
 `
 
 type VerifyUserParams struct {
@@ -264,6 +269,7 @@ func (q *Queries) VerifyUser(ctx context.Context, arg VerifyUserParams) (User, e
 		&i.VerificationToken,
 		&i.VerifiedAt,
 		&i.TokenExpiry,
+		&i.Role,
 	)
 	return i, err
 }
